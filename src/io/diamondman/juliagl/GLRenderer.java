@@ -11,8 +11,8 @@ public abstract class GLRenderer implements Renderer {
 
 	private boolean mFirstDraw;
 	private boolean mSurfaceCreated;
-	protected int mWidth;
-	protected int mHeight;
+	private int mWidth;
+	private int mHeight;
 	private long mLastTime;
 	private int mFPS;
 
@@ -55,7 +55,7 @@ public abstract class GLRenderer implements Renderer {
 		onCreate(mWidth, mHeight, mSurfaceCreated);
 		mSurfaceCreated = false;
 	}
-
+	
 	@Override
 	public void onDrawFrame(GL10 notUsed) {
 		onDrawFrame(mFirstDraw);

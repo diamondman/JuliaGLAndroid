@@ -11,24 +11,29 @@ import android.opengl.Matrix;
 import android.util.Log;
 
 public class JuliaRenderer extends GLRenderer {
-	int vertshad;
-	int fragshad;
-	int progid;
-	int uMVPMatrix_id;
-	int utime_id;
-	int drawPlane_vbo;
-	int posAttrib;
+	private int vertshad;
+	private int fragshad;
+	private int progid;
+	private int fbovertshad;
+	private int fbofragshad;
+	private int fboprogid;
+	private int uMVPMatrix_id;
+	private int drawPlane_vbo;
+	private int posAttrib;
+	private int fbo_tex1;
+	private int fbo1;
+	private int fboposAttrib;
+	private int ufboMVPMatrix_id;
+	private int ufboc_id;
 	
 	float mattransformVertices[] = new float[16];
 	FloatBuffer fbmattransform;
 
 	@Override
-	public void onCreate(int width, int height, boolean contextLost) {
-		progid = GLES20.glCreateProgram();
-		if (progid == 0) {
-			Log.e("JuliaGL", "Error creating GL Program object.\n");
-			throw new RuntimeException("FUCK");
-		}
+	public void onCreate(int width, int height, boolean contextLost) {	
+		GLES20.glViewport(0, 0, width, height);
+		calculateViewMatrix(mattransformVertices, width, height);
+		fbmattransform = JuliaRenderer.fa2fb(mattransformVertices);
 		
 		float vVertices[] = { -0.5f, 0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f, -0.5f };
 		FloatBuffer fbvertices = JuliaRenderer.fa2fb(vVertices);
@@ -36,34 +41,61 @@ public class JuliaRenderer extends GLRenderer {
 		drawPlane_vbo = genSingleBuffer();
 		GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, drawPlane_vbo);
 		GLES20.glBufferData(GLES20.GL_ARRAY_BUFFER, vVertices.length*4, fbvertices, GLES20.GL_STATIC_DRAW);
+		
+		
+		int[] framebuffer_ids = new int[1];
+		GLES20.glGenFramebuffers(1, framebuffer_ids, 0);
+		fbo1 = framebuffer_ids[0];
+		GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fbo1);
+		
+		int[] texture_ids = new int[1];
+		GLES20.glGenTextures(1, texture_ids, 0);
+		fbo_tex1 = texture_ids[0];
+		GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, fbo_tex1);
+		GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D, 0, GLES20.GL_RGB, width, height, 0, GLES20.GL_RGB, GLES20.GL_UNSIGNED_BYTE, null);
+		GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_NEAREST);
+		GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_NEAREST);
+		GLES20.glFramebufferTexture2D(GLES20.GL_FRAMEBUFFER, GLES20.GL_COLOR_ATTACHMENT0, GLES20.GL_TEXTURE_2D, fbo_tex1, 0);
 
+
+		fboprogid = GLES20.glCreateProgram();
+		fbovertshad = createShaderFromResource(R.raw.juliafbovert, GLES20.GL_VERTEX_SHADER);
+		fbofragshad = createShaderFromResource(R.raw.juliafbofrag, GLES20.GL_FRAGMENT_SHADER);
+		GLES20.glAttachShader(fboprogid, fbovertshad);
+		GLES20.glAttachShader(fboprogid, fbofragshad);
+		GLES20.glLinkProgram(fboprogid);
+		checkLinkerrors(fboprogid);
+
+		fboposAttrib = GLES20.glGetAttribLocation(fboprogid, "vPosition");
+		
+		ufboMVPMatrix_id = GLES20.glGetUniformLocation(fboprogid, "uMVPMatrix");
+		ufboc_id = GLES20.glGetUniformLocation(fboprogid, "c");
+		
+		
+
+		progid = GLES20.glCreateProgram();
 		vertshad = createShaderFromResource(R.raw.juliavert, GLES20.GL_VERTEX_SHADER);
 		fragshad = createShaderFromResource(R.raw.juliafrag, GLES20.GL_FRAGMENT_SHADER);
 		GLES20.glAttachShader(progid, vertshad);
 		GLES20.glAttachShader(progid, fragshad);
 		GLES20.glLinkProgram(progid);
-
-		checkLinkerrors();
-		GLES20.glUseProgram(progid);
+		checkLinkerrors(progid);
 		
 		posAttrib = GLES20.glGetAttribLocation(progid, "vPosition");
-		GLES20.glEnableVertexAttribArray(posAttrib);
-		GLES20.glVertexAttribPointer(posAttrib, 2, GLES20.GL_FLOAT, false, 0, 0);
 
-		calculateViewMatrix(mattransformVertices);
-		fbmattransform = JuliaRenderer.fa2fb(mattransformVertices);
 		uMVPMatrix_id = GLES20.glGetUniformLocation(progid, "uMVPMatrix");
-		GLES20.glUniformMatrix4fv(uMVPMatrix_id, 1, false, fbmattransform);
-
-		utime_id = GLES20.glGetUniformLocation(progid, "utime");		
 	}
 
 	@Override
 	public void onDrawFrame(boolean firstDraw) {
 		try {
+			GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0);
 			GLES20.glUseProgram(progid);
+			
+			GLES20.glEnableVertexAttribArray(posAttrib);
+			GLES20.glVertexAttribPointer(posAttrib, 2, GLES20.GL_FLOAT, false, 0, 0);
 
-			GLES20.glUniform1f(utime_id, ((float)(System.currentTimeMillis()-baseTime))/1000f);
+			GLES20.glUniformMatrix4fv(uMVPMatrix_id, 1, false, fbmattransform);
 
 			GLES20.glClearColor(0f, .5f, 0.5f, 1f);		
 			GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
@@ -73,35 +105,36 @@ public class JuliaRenderer extends GLRenderer {
 		}
 	}
 	
+	
 	private int genSingleBuffer(){
 		int[] vbos = new int[1];
 		GLES20.glGenBuffers(1, vbos, 0);
 		return vbos[0];
 	}
 	
- 	private void calculateViewMatrix(float[] m) {
+ 	private void calculateViewMatrix(float[] m, int width, int height) {
 		//Matrix.perspectiveM(mattransformVertices2, 0, 45, ((float)mWidth)/((float)mHeight), 1, 10);
 		Matrix.setIdentityM(m, 0);
-		if(mWidth>mHeight){
-			m[0] = ((float)mHeight)/((float)mWidth);
+		if(width>height){
+			m[0] = ((float)height)/((float)width);
 			m[5] = 1f;
 		}else{
 			m[0] = 1;
-			m[5] = ((float)mWidth)/((float)mHeight);
+			m[5] = ((float)width)/((float)height);
 		}
 	}
 	
-	private void checkLinkerrors() {
+	private void checkLinkerrors(int pid) {
 		int status[] = new int[1];
-		GLES20.glGetProgramiv(progid, GLES20.GL_LINK_STATUS,
+		GLES20.glGetProgramiv(pid, GLES20.GL_LINK_STATUS,
 				IntBuffer.wrap(status));
 
 		if (status[0] == GLES20.GL_FALSE) {
 			Log.e("JuliaGL", "FUCK IT ALL!!!!****\n\n");
 
-			String logMessage = GLES20.glGetProgramInfoLog(progid);
+			String logMessage = GLES20.glGetProgramInfoLog(pid);
 			Log.e("JuliaGL", "ERROR: " + logMessage);
-			GLES20.glDeleteProgram(progid);
+			GLES20.glDeleteProgram(pid);
 			throw new RuntimeException();
 		};
 	}
