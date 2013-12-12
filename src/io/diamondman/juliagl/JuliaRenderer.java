@@ -35,7 +35,7 @@ public class JuliaRenderer extends GLRenderer {
 		calculateViewMatrix(mattransformVertices, width, height);
 		fbmattransform = JuliaRenderer.fa2fb(mattransformVertices);
 		
-		float vVertices[] = { -0.5f, 0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f, -0.5f };
+		float vVertices[] = { -4f, 2f, -4f, -2f, 4f, 2f, 4f, -2f };
 		FloatBuffer fbvertices = JuliaRenderer.fa2fb(vVertices);
 		
 		drawPlane_vbo = genSingleBuffer();
@@ -90,12 +90,14 @@ public class JuliaRenderer extends GLRenderer {
 	public void onDrawFrame(boolean firstDraw) {
 		try {
 			GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0);
-			GLES20.glUseProgram(progid);
+			GLES20.glUseProgram(fboprogid);
 			
-			GLES20.glEnableVertexAttribArray(posAttrib);
-			GLES20.glVertexAttribPointer(posAttrib, 2, GLES20.GL_FLOAT, false, 0, 0);
+			GLES20.glEnableVertexAttribArray(fboposAttrib);
+			GLES20.glVertexAttribPointer(fboposAttrib, 2, GLES20.GL_FLOAT, false, 0, 0);
 
-			GLES20.glUniformMatrix4fv(uMVPMatrix_id, 1, false, fbmattransform);
+			float f = ((float)(System.currentTimeMillis()-baseTime))/100000f;
+			GLES20.glUniformMatrix4fv(ufboMVPMatrix_id, 1, false, fbmattransform);
+			GLES20.glUniform2f(ufboc_id, -0.75f, -f);
 
 			GLES20.glClearColor(0f, .5f, 0.5f, 1f);		
 			GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
@@ -115,12 +117,13 @@ public class JuliaRenderer extends GLRenderer {
  	private void calculateViewMatrix(float[] m, int width, int height) {
 		//Matrix.perspectiveM(mattransformVertices2, 0, 45, ((float)mWidth)/((float)mHeight), 1, 10);
 		Matrix.setIdentityM(m, 0);
+		float scale = 1f;
 		if(width>height){
-			m[0] = ((float)height)/((float)width);
-			m[5] = 1f;
+			m[0] = scale*((float)height)/((float)width);
+			m[5] = scale;
 		}else{
-			m[0] = 1;
-			m[5] = ((float)width)/((float)height);
+			m[0] = scale;
+			m[5] = scale*((float)width)/((float)height);
 		}
 	}
 	
