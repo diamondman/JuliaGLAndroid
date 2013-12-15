@@ -1,9 +1,9 @@
 attribute vec2 vPosition;
-uniform mat4 uMVPMatrix;
+attribute vec2 texcoord;
 varying vec2 comcoord;
 
 void main()
 {
-  gl_Position = uMVPMatrix*vec4(vPosition, 0.0, 1.0);
-  comcoord = vec2(vPosition.xy);
+  gl_Position = vec4(vPosition, 0.0, 1.0);
+  comcoord = texcoord;
 }

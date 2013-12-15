@@ -17,14 +17,17 @@ public class JuliaRenderer extends GLRenderer {
 	private int fbovertshad;
 	private int fbofragshad;
 	private int fboprogid;
-	private int uMVPMatrix_id;
 	private int drawPlane_vbo;
 	private int posAttrib;
+	private int texcoordAttrib;
 	private int fbo_tex1;
 	private int fbo1;
 	private int fboposAttrib;
 	private int ufboMVPMatrix_id;
 	private int ufboc_id;
+	private int texcoord_vbo;
+	
+	long baseTime = System.currentTimeMillis();
 	
 	float mattransformVertices[] = new float[16];
 	FloatBuffer fbmattransform;
@@ -37,10 +40,19 @@ public class JuliaRenderer extends GLRenderer {
 		
 		float vVertices[] = { -4f, 2f, -4f, -2f, 4f, 2f, 4f, -2f };
 		FloatBuffer fbvertices = JuliaRenderer.fa2fb(vVertices);
-		
 		drawPlane_vbo = genSingleBuffer();
 		GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, drawPlane_vbo);
 		GLES20.glBufferData(GLES20.GL_ARRAY_BUFFER, vVertices.length*4, fbvertices, GLES20.GL_STATIC_DRAW);
+
+		float vtexVertices[] = { 
+					-1f, 1f, 0f, 1f, 
+					-1f, -1f, 0f, 0f, 
+					1f, 1f, 1f, 1f, 
+					1f, -1f, 1f, 0f };
+		FloatBuffer fbtexVertices = JuliaRenderer.fa2fb(vtexVertices);
+		texcoord_vbo = genSingleBuffer();
+		GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, texcoord_vbo);
+		GLES20.glBufferData(GLES20.GL_ARRAY_BUFFER, vtexVertices.length*4, fbtexVertices, GLES20.GL_STATIC_DRAW);
 		
 		
 		int[] framebuffer_ids = new int[1];
@@ -82,23 +94,42 @@ public class JuliaRenderer extends GLRenderer {
 		checkLinkerrors(progid);
 		
 		posAttrib = GLES20.glGetAttribLocation(progid, "vPosition");
-
-		uMVPMatrix_id = GLES20.glGetUniformLocation(progid, "uMVPMatrix");
+		texcoordAttrib = GLES20.glGetAttribLocation(progid, "texcoord");
 	}
 
 	@Override
 	public void onDrawFrame(boolean firstDraw) {
 		try {
-			GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0);
+			GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fbo1);
 			GLES20.glUseProgram(fboprogid);
 			
+			GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, drawPlane_vbo);
 			GLES20.glEnableVertexAttribArray(fboposAttrib);
 			GLES20.glVertexAttribPointer(fboposAttrib, 2, GLES20.GL_FLOAT, false, 0, 0);
 
-			float f = ((float)(System.currentTimeMillis()-baseTime))/100000f;
+			//float f = ((float)(System.currentTimeMillis()-baseTime))/100000f;
 			GLES20.glUniformMatrix4fv(ufboMVPMatrix_id, 1, false, fbmattransform);
-			GLES20.glUniform2f(ufboc_id, -0.75f, -f);
+			GLES20.glUniform2f(ufboc_id, -0.75f, 0);
 
+			GLES20.glClearColor(0f, 0f, 0f, 1f);		
+			GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
+			GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
+			
+			
+			
+			GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0);
+			GLES20.glUseProgram(progid);
+
+			GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, texcoord_vbo);
+			GLES20.glEnableVertexAttribArray(texcoordAttrib);
+			GLES20.glVertexAttribPointer(texcoordAttrib, 2, GLES20.GL_FLOAT, false, 16, 8);
+			GLES20.glEnableVertexAttribArray(posAttrib);
+			GLES20.glVertexAttribPointer(posAttrib, 2, GLES20.GL_FLOAT, false, 16, 0);
+			
+			
+			GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
+			GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, fbo_tex1);
+			
 			GLES20.glClearColor(0f, .5f, 0.5f, 1f);		
 			GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
 			GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
@@ -151,8 +182,6 @@ public class JuliaRenderer extends GLRenderer {
 		return fb;
 	}
 
-	long baseTime = System.currentTimeMillis();
-	
 	public int createShaderFromResource(int res, int TYPE) {
 		InputStream jvertinput = AppBase.getContext().getResources()
 				.openRawResource(res);
